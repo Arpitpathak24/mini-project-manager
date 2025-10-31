@@ -9,24 +9,24 @@ using System.Text.Json.Serialization;
 var builder = WebApplication.CreateBuilder(args);
 
 // ----------------------------
-// ✅ CORS (Allow React Frontend)
+// ✅ CORS (Allow Frontend & Production Deployments)
 // ----------------------------
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend",
-        policy =>
-        {
-            policy.WithOrigins(
-                    "http://localhost:5173",
-                    "http://localhost:5174", // <-- add this line
-                    "http://localhost:5175"  // optional future-proofing
-                )
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials();
-        });
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "http://localhost:5175",
+                "https://mini-project-manager-sage.vercel.app", // ✅ Deployed frontend on Vercel
+                "https://mini-project-manager.vercel.app"       // ✅ Optional old/alternate domain
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
 });
-
 
 // ----------------------------
 // ✅ Add Core Services
@@ -34,7 +34,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // 🔧 Fix circular reference (Project <-> Task loop)
+        // 🔧 Prevent circular reference errors in JSON serialization
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.WriteIndented = true;
     });
@@ -57,15 +57,15 @@ var jwtAudience = builder.Configuration["Jwt:Audience"];
 
 if (string.IsNullOrEmpty(jwtKey))
 {
-    throw new Exception("JWT Key is missing in appsettings.json");
+    throw new Exception("JWT Key is missing in configuration.");
 }
 if (string.IsNullOrEmpty(jwtIssuer))
 {
-    throw new Exception("JWT Issuer is missing in appsettings.json");
+    throw new Exception("JWT Issuer is missing in configuration.");
 }
 if (string.IsNullOrEmpty(jwtAudience))
 {
-    throw new Exception("JWT Audience is missing in appsettings.json");
+    throw new Exception("JWT Audience is missing in configuration.");
 }
 
 builder.Services.AddAuthentication(options =>
@@ -95,7 +95,7 @@ builder.Services.AddScoped<AuthService>();
 var app = builder.Build();
 
 // ----------------------------
-// ✅ Middlewares
+// ✅ Middleware Pipeline
 // ----------------------------
 app.UseCors("AllowFrontend");
 
@@ -106,11 +106,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// app.UseHttpsRedirection(); // disable for local if not using https
+// app.UseHttpsRedirection(); // optional, disable if not using https locally
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
 app.Run();
-
