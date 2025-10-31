@@ -1,7 +1,9 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api`
+    : "http://localhost:5000/api", // fallback for local dev
 });
 
 // attach token to requests (skip attaching for /auth endpoints)
@@ -10,7 +12,6 @@ API.interceptors.request.use(
     const token = localStorage.getItem("token");
     if (token) {
       config.headers = config.headers ?? {};
-      // don't attach to auth endpoints that expect no bearer
       if (!config.url?.includes("/auth")) {
         config.headers.Authorization = `Bearer ${token}`;
       }
