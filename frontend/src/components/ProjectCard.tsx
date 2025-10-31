@@ -42,7 +42,7 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
       {showTasks && (
         <>
           <TaskItems projectId={project.id} />
-          <SmartScheduler projectId={project.id} tasks={[]} /> {/* Will connect actual tasks later */}
+          <SmartScheduler projectId={project.id} />
         </>
       )}
 
