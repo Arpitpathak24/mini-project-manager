@@ -40,10 +40,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // ----------------------------
-// ✅ Database (SQLite)
+// ✅ Database (SQLite for Local + Render)
 // ----------------------------
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+                       ?? "Data Source=/tmp/app.db"; // ✅ fallback for Render
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlite(connectionString));
 
 // ----------------------------
 // ✅ JWT Authentication Setup
@@ -53,7 +56,7 @@ var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 
 if (string.IsNullOrEmpty(jwtKey))
-    throw new Exception("JWT Key is missing in appsettings.json");
+    throw new Exception("JWT Key is missing in appsettings.json or environment variables.");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -82,6 +85,15 @@ builder.Services.AddScoped<AuthService>();
 var app = builder.Build();
 
 // ----------------------------
+// ✅ Ensure Database Exists
+// ----------------------------
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated(); // ✅ creates app.db if missing
+}
+
+// ----------------------------
 // ✅ Middlewares
 // ----------------------------
 app.UseCors("AllowFrontend");
@@ -93,9 +105,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();
