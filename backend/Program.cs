@@ -1,24 +1,24 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MiniPM.Api.Data;
+using MiniPM.Api.Services;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ✅ Add services to the container.
-builder.Services.AddControllers();
-
-// ✅ Add CORS with explicit allowed origins
+// ----------------------------
+// ✅ CORS (Allow React Frontend + Deployed Vercel URL)
+// ----------------------------
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy
-            .WithOrigins(
+        policy.WithOrigins(
                 "http://localhost:5173",
-                "http://localhost:5174",
-                "https://mini-project-manager-sage.vercel.app",
-                "https://mini-project-manager.vercel.app"
+                "https://mini-project-manager-sage.vercel.app", // ✅ your live frontend
+                "https://mini-project-manager.vercel.app"        // ✅ optional fallback
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
@@ -26,41 +26,73 @@ builder.Services.AddCors(options =>
     });
 });
 
-// ✅ Configure JWT Authentication
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+// ----------------------------
+// ✅ Add Core Services
+// ----------------------------
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-        };
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.WriteIndented = true;
     });
 
-// ✅ Add DbContext
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// ----------------------------
+// ✅ Database (SQLite)
+// ----------------------------
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-var app = builder.Build();
+// ----------------------------
+// ✅ JWT Authentication Setup
+// ----------------------------
+var jwtKey = builder.Configuration["Jwt:Key"];
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"];
 
-// ✅ Log origin for each request (useful for debugging CORS)
-app.Use(async (context, next) =>
+if (string.IsNullOrEmpty(jwtKey))
+    throw new Exception("JWT Key is missing in appsettings.json");
+
+builder.Services.AddAuthentication(options =>
 {
-    var origin = context.Request.Headers["Origin"].ToString();
-    if (!string.IsNullOrEmpty(origin))
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        Console.WriteLine($"[Request Origin] {origin}");
-    }
-    await next();
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+    };
 });
 
-// ✅ Middleware order is critical
+// ----------------------------
+// ✅ Custom Services
+// ----------------------------
+builder.Services.AddScoped<AuthService>();
+
+var app = builder.Build();
+
+// ----------------------------
+// ✅ Middlewares
+// ----------------------------
 app.UseCors("AllowFrontend");
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 
