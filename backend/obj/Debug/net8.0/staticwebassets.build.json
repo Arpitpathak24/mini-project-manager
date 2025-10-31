@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "37R2nMbTsRTvFXUV4CDBYsSHskGYIbKF59OjV4Ts4MU=",
+  "Source": "MiniPM.Api",
+  "BasePath": "_content/MiniPM.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
